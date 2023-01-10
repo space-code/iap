@@ -28,6 +28,7 @@ type IAPClient struct {
 	Client *http.Client
 }
 
+// Send a receipt to the App Store for verification.
 func (c *IAPClient) verifyReceipt(URL string, data []byte) error {
 	r, err := http.NewRequest("POST", URL, bytes.NewBuffer(data))
 
@@ -52,15 +53,22 @@ func (c *IAPClient) verifyReceipt(URL string, data []byte) error {
 	return c.parseResponse(res, data)
 }
 
+// Send a receipt to the App Store for verification.
 func (c *IAPClient) VerifyReceipt(request IAPValidationRequest) error {
 	data, err := json.Marshal(request)
+
 	if err != nil {
-		fmt.Printf("Error occured")
+		return err
 	}
 
 	return c.verifyReceipt(c.URL, data)
 }
 
+// Parse response from the App Store.
+//
+// The method reads data from the response's body and decodes it to the IAPValidationResponse.
+//
+// Also, the method checks the status code of the response and if it is equal to 21007 sends a new request with a sandbox URL.
 func (c *IAPClient) parseResponse(res *http.Response, data []byte) error {
 	body, err := io.ReadAll(res.Body)
 
@@ -68,12 +76,9 @@ func (c *IAPClient) parseResponse(res *http.Response, data []byte) error {
 		return err
 	}
 
-	fmt.Printf("Response")
-	fmt.Println(string(body))
-
 	var s Status
 	if err := json.Unmarshal(body, &s); err != nil {
-		fmt.Printf("Cannot unmarshal json")
+		return err
 	}
 
 	if s.Status == 21007 {
@@ -82,7 +87,7 @@ func (c *IAPClient) parseResponse(res *http.Response, data []byte) error {
 
 	var receipt IAPValidationResponse
 	if err := json.Unmarshal(body, &receipt); err != nil {
-		fmt.Printf("Cannot unmarshal json")
+		return err
 	}
 
 	return nil
