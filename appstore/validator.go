@@ -2,6 +2,7 @@ package appstore
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -19,7 +20,7 @@ const (
 )
 
 type Client interface {
-	VerifyReceipt(request IAPValidationRequest, response *IAPValidationResponse) error
+	VerifyReceipt(ctx context.Context, request IAPValidationRequest, response *IAPValidationResponse) error
 }
 
 // IAPClients implements Client
@@ -29,8 +30,9 @@ type IAPClient struct {
 }
 
 // Send a receipt to the App Store for verification.
-func (c *IAPClient) verifyReceipt(URL string, data []byte, response *IAPValidationResponse) error {
+func (c *IAPClient) verifyReceipt(ctx context.Context, URL string, data []byte, response *IAPValidationResponse) error {
 	r, err := http.NewRequest("POST", URL, bytes.NewBuffer(data))
+	r = r.WithContext(ctx)
 
 	if err != nil {
 		return err
@@ -50,18 +52,18 @@ func (c *IAPClient) verifyReceipt(URL string, data []byte, response *IAPValidati
 
 	defer r.Body.Close()
 
-	return c.parseResponse(res, data, response)
+	return c.parseResponse(ctx, res, data, response)
 }
 
 // Send a receipt to the App Store for verification.
-func (c *IAPClient) VerifyReceipt(request IAPValidationRequest, response *IAPValidationResponse) error {
+func (c *IAPClient) VerifyReceipt(ctx context.Context, request IAPValidationRequest, response *IAPValidationResponse) error {
 	data, err := json.Marshal(request)
 
 	if err != nil {
 		return err
 	}
 
-	return c.verifyReceipt(c.URL, data, response)
+	return c.verifyReceipt(ctx, c.URL, data, response)
 }
 
 // Parse response from the App Store.
@@ -69,7 +71,7 @@ func (c *IAPClient) VerifyReceipt(request IAPValidationRequest, response *IAPVal
 // The method reads data from the response's body and decodes it to the IAPValidationResponse.
 //
 // Also, the method checks the status code of the response and if it is equal to 21007 sends a new request with a sandbox URL.
-func (c *IAPClient) parseResponse(res *http.Response, data []byte, result *IAPValidationResponse) error {
+func (c *IAPClient) parseResponse(ctx context.Context, res *http.Response, data []byte, result *IAPValidationResponse) error {
 	body, err := io.ReadAll(res.Body)
 
 	if err != nil {
@@ -82,7 +84,7 @@ func (c *IAPClient) parseResponse(res *http.Response, data []byte, result *IAPVa
 	}
 
 	if s.Status == 21007 {
-		return c.verifyReceipt(SandboxURL, data, result)
+		return c.verifyReceipt(ctx, SandboxURL, data, result)
 	}
 
 	if err := json.Unmarshal(body, &result); err != nil {
