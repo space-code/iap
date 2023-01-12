@@ -19,7 +19,7 @@ const (
 )
 
 type Client interface {
-	VerifyReceipt(request IAPValidationRequest) error
+	VerifyReceipt(request IAPValidationRequest, response *IAPValidationResponse) error
 }
 
 // IAPClients implements Client
@@ -29,7 +29,7 @@ type IAPClient struct {
 }
 
 // Send a receipt to the App Store for verification.
-func (c *IAPClient) verifyReceipt(URL string, data []byte) error {
+func (c *IAPClient) verifyReceipt(URL string, data []byte, response *IAPValidationResponse) error {
 	r, err := http.NewRequest("POST", URL, bytes.NewBuffer(data))
 
 	if err != nil {
@@ -50,18 +50,18 @@ func (c *IAPClient) verifyReceipt(URL string, data []byte) error {
 
 	defer r.Body.Close()
 
-	return c.parseResponse(res, data)
+	return c.parseResponse(res, data, response)
 }
 
 // Send a receipt to the App Store for verification.
-func (c *IAPClient) VerifyReceipt(request IAPValidationRequest) error {
+func (c *IAPClient) VerifyReceipt(request IAPValidationRequest, response *IAPValidationResponse) error {
 	data, err := json.Marshal(request)
 
 	if err != nil {
 		return err
 	}
 
-	return c.verifyReceipt(c.URL, data)
+	return c.verifyReceipt(c.URL, data, response)
 }
 
 // Parse response from the App Store.
@@ -69,7 +69,7 @@ func (c *IAPClient) VerifyReceipt(request IAPValidationRequest) error {
 // The method reads data from the response's body and decodes it to the IAPValidationResponse.
 //
 // Also, the method checks the status code of the response and if it is equal to 21007 sends a new request with a sandbox URL.
-func (c *IAPClient) parseResponse(res *http.Response, data []byte) error {
+func (c *IAPClient) parseResponse(res *http.Response, data []byte, result *IAPValidationResponse) error {
 	body, err := io.ReadAll(res.Body)
 
 	if err != nil {
@@ -82,11 +82,10 @@ func (c *IAPClient) parseResponse(res *http.Response, data []byte) error {
 	}
 
 	if s.Status == 21007 {
-		return c.verifyReceipt(SandboxURL, data)
+		return c.verifyReceipt(SandboxURL, data, result)
 	}
 
-	var receipt IAPValidationResponse
-	if err := json.Unmarshal(body, &receipt); err != nil {
+	if err := json.Unmarshal(body, &result); err != nil {
 		return err
 	}
 
