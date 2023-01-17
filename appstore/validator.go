@@ -25,8 +25,9 @@ type Client interface {
 
 // IAPClients implements Client
 type IAPClient struct {
-	URL    string
-	Client *http.Client
+	SandboxURL    string
+	ProductionURL string
+	Client        *http.Client
 }
 
 // Send a receipt to the App Store for verification.
@@ -63,7 +64,7 @@ func (c *IAPClient) VerifyReceipt(ctx context.Context, request IAPValidationRequ
 		return err
 	}
 
-	return c.verifyReceipt(ctx, c.URL, data, response)
+	return c.verifyReceipt(ctx, c.ProductionURL, data, response)
 }
 
 // Parse response from the App Store.
@@ -84,7 +85,7 @@ func (c *IAPClient) parseResponse(ctx context.Context, res *http.Response, data 
 	}
 
 	if s.Status == 21007 {
-		return c.verifyReceipt(ctx, SandboxURL, data, result)
+		return c.verifyReceipt(ctx, c.SandboxURL, data, result)
 	}
 
 	if err := json.Unmarshal(body, &result); err != nil {
@@ -97,8 +98,9 @@ func (c *IAPClient) parseResponse(ctx context.Context, res *http.Response, data 
 // Create new instance of IAPClient.
 func NewWithClient(c *http.Client) *IAPClient {
 	client := &IAPClient{
-		URL:    ProductionURL,
-		Client: c,
+		ProductionURL: ProductionURL,
+		SandboxURL:    SandboxURL,
+		Client:        c,
 	}
 	return client
 }
@@ -106,8 +108,9 @@ func NewWithClient(c *http.Client) *IAPClient {
 // Create new instance of IAPClient.
 func New() *IAPClient {
 	client := &IAPClient{
-		URL:    ProductionURL,
-		Client: &http.Client{Timeout: 30 * time.Second},
+		ProductionURL: ProductionURL,
+		SandboxURL:    SandboxURL,
+		Client:        &http.Client{Timeout: 30 * time.Second},
 	}
 	return client
 }
